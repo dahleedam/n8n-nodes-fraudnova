@@ -1,0 +1,18 @@
+{
+	"node": "n8n-nodes-fraudnova.fraudNova",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Development", "Utility"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://fraudnova.com/docs"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://fraudnova.com/guides/automate-fraud-checks-in-n8n"
+			}
+		]
+	}
+}
