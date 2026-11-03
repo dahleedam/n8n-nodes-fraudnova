@@ -226,14 +226,24 @@ describe('mapStatusError', () => {
 
 	it('maps 429 in the after-retries form', () => {
 		expect(mapStatusError(429, { message: 'Rate limit exceeded. Try again shortly.' })).toBe(
-			'FraudNova rate limit reached: Rate limit exceeded. Try again shortly.. Use "Check many" for lists or add a Wait node.',
+			'FraudNova rate limit reached: Rate limit exceeded. Try again shortly. Use "Check many" for lists or add a Wait node.',
 		);
 	});
 
 	it('maps 502', () => {
 		expect(mapStatusError(502, { message: 'All upstream keys failed.' })).toBe(
-			'FraudNova could not complete the check: All upstream keys failed.. The credit was refunded.',
+			'FraudNova could not complete the check: All upstream keys failed. The credit was refunded.',
 		);
+	});
+
+	it('adds a period to a 422 message that lacks one', () => {
+		expect(mapStatusError(422, { message: 'Bad input' })).toBe(
+			'FraudNova rejected the input: Bad input.',
+		);
+	});
+
+	it('keeps the generic form raw', () => {
+		expect(mapStatusError(500, { message: 'Oops.' })).toBe('FraudNova returned HTTP 500: Oops.');
 	});
 
 	it('maps other statuses with a JSON body message', () => {

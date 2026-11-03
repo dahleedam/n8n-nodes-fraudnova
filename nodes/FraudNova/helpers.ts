@@ -89,6 +89,10 @@ export function shapeCheckOutput(
 	};
 }
 
+function stripTrailingPeriod(text: string): string {
+	return text.endsWith('.') ? text.slice(0, -1) : text;
+}
+
 function bodyMessage(body: unknown): string {
 	if (typeof body === 'object' && body !== null) {
 		const message = (body as { message?: unknown }).message;
@@ -101,6 +105,7 @@ function bodyMessage(body: unknown): string {
 
 export function mapStatusError(status: number, body: unknown): string {
 	const message = bodyMessage(body);
+	const fragment = stripTrailingPeriod(message);
 	switch (status) {
 		case 401:
 			return 'FraudNova rejected the API key. Check the FraudNova API credential.';
@@ -109,26 +114,27 @@ export function mapStatusError(status: number, body: unknown): string {
 		case 403:
 			return 'FraudNova account is suspended. Contact support@fraudnova.com.';
 		case 422:
-			return `FraudNova rejected the input: ${message}`;
+			return `FraudNova rejected the input: ${fragment}.`;
 		case 429:
-			return `FraudNova rate limit reached: ${message}. Use "Check many" for lists or add a Wait node.`;
+			return `FraudNova rate limit reached: ${fragment}. Use "Check many" for lists or add a Wait node.`;
 		case 502:
-			return `FraudNova could not complete the check: ${message}. The credit was refunded.`;
+			return `FraudNova could not complete the check: ${fragment}. The credit was refunded.`;
 		default:
 			return `FraudNova returned HTTP ${status}: ${message}`;
 	}
 }
 
-const INVALID_SUBJECT_LABEL: Record<string, string> = {
-	invalid_ip: 'IP address',
-	invalid_email: 'email address',
-	invalid_phone: 'phone number',
+const SUBJECT_NOUN: Record<CheckType, string> = {
+	ip: 'IP address',
+	email: 'email address',
+	phone: 'phone number',
 };
 
+const INVALID_CODES = ['invalid_ip', 'invalid_email', 'invalid_phone'];
+
 export function mapBatchItemError(type: CheckType, subject: string, code: string): string {
-	void type;
-	if (code in INVALID_SUBJECT_LABEL) {
-		return `FraudNova rejected "${subject}" as an invalid ${INVALID_SUBJECT_LABEL[code]}.`;
+	if (INVALID_CODES.includes(code)) {
+		return `FraudNova rejected "${subject}" as an invalid ${SUBJECT_NOUN[type]}.`;
 	}
 	if (code === 'insufficient_credits') {
 		return OUT_OF_CREDITS;
