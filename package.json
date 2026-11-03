@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-fraudnova",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "FraudNova fraud scores for IP addresses, email addresses and phone numbers in n8n",
 	"license": "MIT",
 	"homepage": "https://fraudnova.com",
