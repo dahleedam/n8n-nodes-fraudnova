@@ -61,7 +61,7 @@ In n8n, create a **FraudNova API** credential and paste the key into the **API K
 
 ## Compatibility
 
-Requires n8n 1.x or later. Tested on the current n8n release.
+Requires n8n 1.85.0 or later.
 
 ## Usage
 
