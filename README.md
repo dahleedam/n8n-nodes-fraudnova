@@ -97,7 +97,7 @@ Turn **Simplify** off to get every field the API returns for that check type.
 
 ### The `flagged` field
 
-`flagged` is `true` when the `fraud_score` is at or above the **Risk Threshold** (default 75), or when any field you selected under **Flag On** is `true`. `flag_reasons` lists which of those fired, for example `["fraud_score", "proxy"]`. Both are calculated from the full API response, whether or not Simplify is on. A failed check is never flagged.
+`flagged` is `true` when the `fraud_score` is at or above the **Risk Threshold** (default 75), or when any field you selected under **Flag On** is `true`. `flag_reasons` lists which of those fired, for example `["fraud_score", "proxy"]`. Both are calculated from the full API response, whether or not Simplify is on. A failed check is never flagged: error items have no `flagged` field at all, so handle them separately (for example, route items where `error` is set to their own branch before the IF).
 
 ### Errors
 
@@ -117,11 +117,11 @@ An error on a single check stops the workflow by default. Set the node's **On Er
 
 ### Credits
 
-One check costs one credit, whichever type it is. Failed checks are refunded. `credits_remaining` is on every item, so you can branch on it or alert yourself before you run out.
+One check costs one credit, whichever type it is. Failed checks are refunded. `credits_remaining` is on every successful item (not on error items), so you can branch on it or alert yourself before you run out.
 
 ### Rate limits
 
-The API allows a generous number of requests per minute for each key, and at most 10 checks in flight at once per account. A **Check Many** request counts as one. The node runs items one after another, and backs off automatically when it gets a 429, with short waits for the concurrency cap and longer waits for the per-minute limit, before failing the item. For long lists, use **Check Many**.
+The API allows a generous number of requests per minute for each key, and at most 10 checks in flight at once per account. A **Check Many** request counts as one. The node runs items one after another, and backs off automatically when it gets a 429, with short waits for the concurrency cap and longer waits for the per-minute limit, before failing. With **Check** that fails the item; with **Check Many** a 429 that exhausts its retries fails the whole request of up to 100 items (following On Error). For long lists, use **Check Many**.
 
 ### Example: block risky signups
 
@@ -129,7 +129,7 @@ A three-node workflow:
 
 1. **Webhook** receives a signup with an `ip` field.
 2. **FraudNova** (IP Address → Check) with IP Address set to `{{ $json.body.ip }}`.
-3. **IF** with the condition `{{ $json.flagged }}` is true. Send the true branch to manual review or a block, and the false branch to your normal flow.
+3. **IF** with the condition `{{ $json.flagged }}` is true. (To handle failed checks, add a branch for items where `error` is set before this IF.) Send the true branch to manual review or a block, and the false branch to your normal flow.
 
 Ready-to-import workflows are in the [examples repository](https://github.com/dahleedam/fraudnova-examples/tree/main/examples/n8n).
 
