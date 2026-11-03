@@ -246,6 +246,12 @@ describe('mapStatusError', () => {
 		expect(mapStatusError(500, { message: 'Oops.' })).toBe('FraudNova returned HTTP 500: Oops.');
 	});
 
+	it('serializes an object body without a string message', () => {
+		expect(mapStatusError(500, { errors: ['x'] })).toBe(
+			'FraudNova returned HTTP 500: {"errors":["x"]}',
+		);
+	});
+
 	it('maps other statuses with a JSON body message', () => {
 		expect(mapStatusError(418, { message: 'I am a teapot' })).toBe(
 			'FraudNova returned HTTP 418: I am a teapot',
@@ -259,7 +265,9 @@ describe('mapStatusError', () => {
 	});
 
 	it('truncates a non-message body to 200 characters', () => {
-		expect(mapStatusError(500, 'x'.repeat(300))).toBe(`FraudNova returned HTTP 500: ${'x'.repeat(200)}`);
+		expect(mapStatusError(500, 'x'.repeat(300))).toBe(
+			`FraudNova returned HTTP 500: ${'x'.repeat(200)}`,
+		);
 	});
 });
 

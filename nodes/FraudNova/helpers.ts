@@ -99,6 +99,14 @@ function bodyMessage(body: unknown): string {
 		if (typeof message === 'string') {
 			return message;
 		}
+		try {
+			const json = JSON.stringify(body);
+			if (typeof json === 'string') {
+				return json.slice(0, 200);
+			}
+		} catch {
+			// fall through to String(body)
+		}
 	}
 	return String(body).slice(0, 200);
 }
