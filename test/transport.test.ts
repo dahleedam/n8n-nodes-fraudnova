@@ -1,4 +1,4 @@
-import type { IExecuteFunctions } from 'n8n-workflow';
+import type { IExecuteFunctions, JsonObject } from 'n8n-workflow';
 import { NodeApiError, sleep } from 'n8n-workflow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BASE_URL, fraudNovaRequest } from '../nodes/FraudNova/transport';
@@ -138,5 +138,28 @@ describe('fraudNovaRequest', () => {
 		expect(error).toBeInstanceOf(NodeApiError);
 		expect(error.message).toBe('FraudNova request failed: socket hang up');
 		expect(error.context.itemIndex).toBe(5);
+	});
+
+	it('replaces the message of a NodeApiError raised by the helper', async () => {
+		httpRequestWithAuthentication.mockRejectedValueOnce(
+			new NodeApiError(context.getNode(), { message: 'socket hang up' } as JsonObject),
+		);
+
+		const error = await caught(call(4));
+
+		expect(error).toBeInstanceOf(NodeApiError);
+		expect(error.message).toBe('FraudNova request failed: socket hang up');
+		expect(error.context.itemIndex).toBe(4);
+	});
+
+	it('rejects a 2xx response whose body is not an object', async () => {
+		httpRequestWithAuthentication.mockResolvedValueOnce(response(200, '<html>ok</html>'));
+
+		const error = await caught(call(1));
+
+		expect(error).toBeInstanceOf(NodeApiError);
+		expect(error.message).toBe('FraudNova returned an unexpected response (HTTP 200).');
+		expect(error.httpCode).toBe('200');
+		expect(error.context.itemIndex).toBe(1);
 	});
 });

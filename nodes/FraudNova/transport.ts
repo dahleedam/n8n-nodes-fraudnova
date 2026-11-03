@@ -37,14 +37,22 @@ export async function fraudNovaRequest(
 				requestOptions,
 			)) as FullResponse;
 		} catch (error) {
-			throw new NodeApiError(this.getNode(), error as JsonObject, {
-				message: `FraudNova request failed: ${(error as Error).message}`,
+			const reason = error instanceof Error ? error.message : String(error);
+			throw new NodeApiError(this.getNode(), { message: reason } as JsonObject, {
+				message: `FraudNova request failed: ${reason}`,
 				itemIndex,
 			});
 		}
 
 		const { statusCode, body } = response;
 		if (statusCode >= 200 && statusCode < 300) {
+			if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+				throw new NodeApiError(this.getNode(), { body: String(body) } as JsonObject, {
+					message: `FraudNova returned an unexpected response (HTTP ${statusCode}).`,
+					httpCode: String(statusCode),
+					itemIndex,
+				});
+			}
 			return { body: body as Record<string, unknown>, statusCode };
 		}
 
