@@ -117,7 +117,7 @@ An error on a single check stops the workflow by default. Set the node's **On Er
 { "error": "<message>", "code": "invalid_ip", "ip": "not-an-ip" }
 ```
 
-`code` is the error code for that item, for example `invalid_ip`, `invalid_email`, `invalid_phone`, `insufficient_credits` or `upstream_failed`. An empty value gets the code `empty`. A problem with the whole request, such as a rejected API key, fails the node. With On Error set to Continue, every item in that request instead gets an error item without a `code`.
+`code` is the error code for that item, for example `invalid_ip`, `invalid_email`, `invalid_phone`, `insufficient_credits` or `upstream_failed`. An empty value gets the code `empty`. An item whose parameters cannot be read, for example because of a broken expression, gets the code `parameter` when On Error is set to Continue; otherwise the node stops before it sends any request. A problem with the whole request, such as a rejected API key, fails the node. With On Error set to Continue, every item in that request instead gets an error item without a `code`.
 
 ### Credits
 

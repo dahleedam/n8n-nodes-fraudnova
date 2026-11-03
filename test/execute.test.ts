@@ -1,4 +1,5 @@
 import type { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
 import { describe, expect, it, vi } from 'vitest';
 import { FraudNova } from '../nodes/FraudNova/FraudNova.node';
 import { BASE_URL } from '../nodes/FraudNova/transport';
@@ -68,6 +69,24 @@ const request = (
 const OUT_OF_CREDITS =
 	'FraudNova account is out of credits. Buy credits at https://fraudnova.com/dashboard/billing.';
 const BAD_KEY = 'FraudNova rejected the API key. Check the FraudNova API credential.';
+
+const EXPRESSION_ERROR = 'Expression failed for this item.';
+
+const throwsAt =
+	(bad: number, value: (i: number) => unknown) =>
+	(i: number): unknown => {
+		if (i === bad) {
+			throw new Error(EXPRESSION_ERROR);
+		}
+		return value(i);
+	};
+
+const okBatch = async (_credential: string, options: { body: { ips: string[] } }) =>
+	response(200, {
+		success: true,
+		results: options.body.ips.map((ip) => ({ ip, success: true, data: IP_DATA })),
+		credits_remaining: 5,
+	});
 
 const simplifiedIp = (ip: string, creditsRemaining: number) => ({
 	ip,
@@ -302,6 +321,69 @@ describe('FraudNova.execute — Check', () => {
 
 		await expect(run(context)).rejects.toThrow('The ip field is empty for this item.');
 		expect(http).not.toHaveBeenCalled();
+	});
+
+	it('turns a failing parameter read into an error item when On Error is Continue', async () => {
+		const ips = ['8.8.8.8', 'unused', '1.1.1.1'];
+		const { context, http } = ctx({
+			items: inputs(3),
+			params: { resource: 'ip', operation: 'check', ip: throwsAt(1, (i) => ips[i]) },
+			continueOnFail: true,
+		});
+		http.mockResolvedValue(response(200, { success: true, data: IP_DATA, credits_remaining: 7 }));
+
+		const result = await run(context);
+
+		expect(http.mock.calls).toEqual([
+			request('GET', '/check', { qs: { ip: '8.8.8.8' } }, 30000),
+			request('GET', '/check', { qs: { ip: '1.1.1.1' } }, 30000),
+		]);
+		expect(result).toEqual([
+			[
+				{ json: simplifiedIp('8.8.8.8', 7), pairedItem: { item: 0 } },
+				{ json: { error: EXPRESSION_ERROR, ip: '' }, pairedItem: { item: 1 } },
+				{ json: simplifiedIp('1.1.1.1', 7), pairedItem: { item: 2 } },
+			],
+		]);
+	});
+
+	it('follows On Error when reading the options fails', async () => {
+		const ips = ['8.8.8.8', '9.9.9.9'];
+		const { context, http } = ctx({
+			items: inputs(2),
+			params: {
+				resource: 'ip',
+				operation: 'check',
+				ip: (i: number) => ips[i],
+				options: throwsAt(0, () => ({})),
+			},
+			continueOnFail: true,
+		});
+		http.mockResolvedValue(response(200, { success: true, data: IP_DATA, credits_remaining: 7 }));
+
+		const result = await run(context);
+
+		expect(http.mock.calls).toEqual([request('GET', '/check', { qs: { ip: '9.9.9.9' } }, 30000)]);
+		expect(result[0][0]).toEqual({
+			json: { error: EXPRESSION_ERROR, ip: '8.8.8.8' },
+			pairedItem: { item: 0 },
+		});
+	});
+
+	it('throws a failing parameter read with its item index when On Error is not Continue', async () => {
+		const ips = ['8.8.8.8', 'unused', '1.1.1.1'];
+		const { context, http } = ctx({
+			items: inputs(3),
+			params: { resource: 'ip', operation: 'check', ip: throwsAt(1, (i) => ips[i]) },
+		});
+		http.mockResolvedValue(response(200, { success: true, data: IP_DATA, credits_remaining: 7 }));
+
+		const error = await run(context).catch((caught: unknown) => caught);
+
+		expect(error).toBeInstanceOf(NodeOperationError);
+		expect((error as NodeOperationError).message).toBe(EXPRESSION_ERROR);
+		expect((error as NodeOperationError).context.itemIndex).toBe(1);
+		expect(http).toHaveBeenCalledTimes(1);
 	});
 });
 
@@ -580,6 +662,46 @@ describe('FraudNova.execute — Check many', () => {
 			pairedItem: { item: 50 },
 		});
 		expect(result[0][51]).toEqual({ json: simplifiedIp(ipAt(51), 5), pairedItem: { item: 51 } });
+	});
+
+	it('turns a failing parameter read into a parameter error item when On Error is Continue', async () => {
+		const { context, http } = ctx({
+			items: inputs(3),
+			params: { resource: 'ip', operation: 'checkMany', ip: throwsAt(1, ipAt) },
+			continueOnFail: true,
+		});
+		http.mockImplementation(okBatch);
+
+		const result = await run(context);
+
+		expect(http.mock.calls).toEqual([
+			request('POST', '/check/batch', { body: { ips: [ipAt(0), ipAt(2)] } }, 300000),
+		]);
+		expect(result).toEqual([
+			[
+				{ json: simplifiedIp(ipAt(0), 5), pairedItem: { item: 0 } },
+				{
+					json: { error: EXPRESSION_ERROR, code: 'parameter', ip: '' },
+					pairedItem: { item: 1 },
+				},
+				{ json: simplifiedIp(ipAt(2), 5), pairedItem: { item: 2 } },
+			],
+		]);
+	});
+
+	it('throws a failing parameter read before any request when On Error is not Continue', async () => {
+		const { context, http } = ctx({
+			items: inputs(3),
+			params: { resource: 'ip', operation: 'checkMany', ip: throwsAt(1, ipAt) },
+		});
+		http.mockImplementation(okBatch);
+
+		const error = await run(context).catch((caught: unknown) => caught);
+
+		expect(error).toBeInstanceOf(NodeOperationError);
+		expect((error as NodeOperationError).message).toBe(EXPRESSION_ERROR);
+		expect((error as NodeOperationError).context.itemIndex).toBe(1);
+		expect(http).not.toHaveBeenCalled();
 	});
 });
 

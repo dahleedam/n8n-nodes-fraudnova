@@ -114,6 +114,40 @@ function successItem(
 	};
 }
 
+function itemError(
+	this: IExecuteFunctions,
+	error: Error,
+	itemIndex: number,
+): NodeApiError | NodeOperationError {
+	if (error instanceof NodeApiError) {
+		return new NodeApiError(this.getNode(), error as unknown as JsonObject, { itemIndex });
+	}
+	return new NodeOperationError(this.getNode(), error, { itemIndex });
+}
+
+async function checkOne(
+	this: IExecuteFunctions,
+	type: CheckType,
+	subject: string,
+	itemIndex: number,
+): Promise<INodeExecutionData> {
+	if (subject === '') {
+		throw new NodeOperationError(this.getNode(), emptyMessage(type), { itemIndex });
+	}
+	const options = readCheckOptions.call(this, type, itemIndex);
+	const { body } = await fraudNovaRequest.call(
+		this,
+		{
+			method: 'GET',
+			path: SINGLE_PATH[type],
+			qs: { [type]: subject, ...apiOptions(options, true) },
+			timeout: SINGLE_TIMEOUT_MS,
+		},
+		itemIndex,
+	);
+	return successItem(type, subject, body.data, body.credits_remaining, options, itemIndex);
+}
+
 export async function executeCheck(
 	this: IExecuteFunctions,
 	type: CheckType,
@@ -121,33 +155,15 @@ export async function executeCheck(
 ): Promise<INodeExecutionData[]> {
 	const output: INodeExecutionData[] = [];
 	for (let i = 0; i < items.length; i++) {
-		const subject = readSubject.call(this, type, i);
-		if (subject === '') {
-			if (!this.continueOnFail()) {
-				throw new NodeOperationError(this.getNode(), emptyMessage(type), { itemIndex: i });
-			}
-			output.push(errorItem(type, subject, emptyMessage(type), i));
-			continue;
-		}
-		const options = readCheckOptions.call(this, type, i);
+		let subject = '';
 		try {
-			const { body } = await fraudNovaRequest.call(
-				this,
-				{
-					method: 'GET',
-					path: SINGLE_PATH[type],
-					qs: { [type]: subject, ...apiOptions(options, true) },
-					timeout: SINGLE_TIMEOUT_MS,
-				},
-				i,
-			);
-			output.push(successItem(type, subject, body.data, body.credits_remaining, options, i));
+			subject = readSubject.call(this, type, i);
+			output.push(await checkOne.call(this, type, subject, i));
 		} catch (error) {
-			if (this.continueOnFail()) {
-				output.push(errorItem(type, subject, error.message, i));
-				continue;
+			if (!this.continueOnFail()) {
+				throw itemError.call(this, error, i);
 			}
-			throw new NodeApiError(this.getNode(), error as JsonObject, { itemIndex: i });
+			output.push(errorItem(type, subject, error.message, i));
 		}
 	}
 	return output;
@@ -190,6 +206,32 @@ async function checkChunk(
 	});
 }
 
+function collectPending(
+	this: IExecuteFunctions,
+	type: CheckType,
+	count: number,
+	output: INodeExecutionData[],
+): Pending[] {
+	const pending: Pending[] = [];
+	for (let i = 0; i < count; i++) {
+		let subject = '';
+		try {
+			subject = readSubject.call(this, type, i);
+			if (subject === '') {
+				output[i] = errorItem(type, subject, emptyMessage(type), i, 'empty');
+			} else {
+				pending.push({ index: i, subject, options: readCheckOptions.call(this, type, i) });
+			}
+		} catch (error) {
+			if (!this.continueOnFail()) {
+				throw new NodeOperationError(this.getNode(), error as Error, { itemIndex: i });
+			}
+			output[i] = errorItem(type, subject, error.message, i, 'parameter');
+		}
+	}
+	return pending;
+}
+
 function batchesOf(pending: Pending[]): Pending[][] {
 	const signature = (entry: Pending) => JSON.stringify(apiOptions(entry.options, false));
 	const batches: Pending[][] = [];
@@ -205,15 +247,7 @@ export async function executeCheckMany(
 	items: INodeExecutionData[],
 ): Promise<INodeExecutionData[]> {
 	const output: INodeExecutionData[] = new Array(items.length);
-	const pending: Pending[] = [];
-	for (let i = 0; i < items.length; i++) {
-		const subject = readSubject.call(this, type, i);
-		if (subject === '') {
-			output[i] = errorItem(type, subject, emptyMessage(type), i, 'empty');
-		} else {
-			pending.push({ index: i, subject, options: readCheckOptions.call(this, type, i) });
-		}
-	}
+	const pending = collectPending.call(this, type, items.length, output);
 	for (const group of batchesOf(pending)) {
 		try {
 			const shaped = await checkChunk.call(this, type, group);
