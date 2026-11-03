@@ -99,6 +99,10 @@ Turn **Simplify** off to get every field the API returns for that check type.
 
 `flagged` is `true` when the `fraud_score` is at or above the **Risk Threshold** (default 75), or when any field you selected under **Flag On** is `true`. `flag_reasons` lists which of those fired, for example `["fraud_score", "proxy"]`. Both are calculated from the full API response, whether or not Simplify is on. A failed check is never flagged: error items have no `flagged` field at all, so handle them separately (for example, route items where `error` is set to their own branch before the IF).
 
+### Check Many
+
+**Check Many** sends up to 100 values per request. Items are grouped by their request options (Strictness, Mobile, User Agent, User Language or Country), so each request carries one set of options and every item is checked with its own. Risk Threshold, Flag On and Simplify apply per item. Output items stay in input order.
+
 ### Errors
 
 An error on a single check stops the workflow by default. Set the node's **On Error** setting to **Continue** and a failed item comes out as:

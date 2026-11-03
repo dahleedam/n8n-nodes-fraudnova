@@ -342,6 +342,72 @@ describe('FraudNova.execute — Check many', () => {
 		});
 	});
 
+	it('sends one request per set of request options, keeping output in input order', async () => {
+		const agents = ['A', 'B', 'A'];
+		const { context, http } = ctx({
+			items: inputs(3),
+			params: {
+				resource: 'ip',
+				operation: 'checkMany',
+				ip: ipAt,
+				options: (i: number) => ({ userAgent: agents[i] }),
+			},
+		});
+		const credits = [10, 9];
+		http.mockImplementation(async (_credential: string, options: { body: { ips: string[] } }) =>
+			response(200, {
+				success: true,
+				results: options.body.ips.map((ip) => ({ ip, success: true, data: IP_DATA })),
+				credits_remaining: credits.shift(),
+			}),
+		);
+
+		const result = await run(context);
+
+		expect(http.mock.calls).toEqual([
+			request(
+				'POST',
+				'/check/batch',
+				{ body: { ips: [ipAt(0), ipAt(2)], user_agent: 'A' } },
+				300000,
+			),
+			request('POST', '/check/batch', { body: { ips: [ipAt(1)], user_agent: 'B' } }, 300000),
+		]);
+		expect(result).toEqual([
+			[
+				{ json: simplifiedIp(ipAt(0), 10), pairedItem: { item: 0 } },
+				{ json: simplifiedIp(ipAt(1), 9), pairedItem: { item: 1 } },
+				{ json: simplifiedIp(ipAt(2), 10), pairedItem: { item: 2 } },
+			],
+		]);
+	});
+
+	it('applies the threshold and flag options of each item to its own output', async () => {
+		const thresholds = [10, 90];
+		const { context, http } = ctx({
+			items: inputs(2),
+			params: {
+				resource: 'ip',
+				operation: 'checkMany',
+				ip: ipAt,
+				options: (i: number) => ({ riskThreshold: thresholds[i] }),
+			},
+		});
+		http.mockResolvedValueOnce(
+			response(200, {
+				success: true,
+				results: [0, 1].map((i) => ({ ip: ipAt(i), success: true, data: IP_DATA })),
+				credits_remaining: 5,
+			}),
+		);
+
+		const result = await run(context);
+
+		expect(http).toHaveBeenCalledTimes(1);
+		expect(result[0][0].json).toMatchObject({ flagged: true, flag_reasons: ['fraud_score'] });
+		expect(result[0][1].json).toMatchObject({ flagged: false, flag_reasons: [] });
+	});
+
 	it('never throws on per-item batch failures', async () => {
 		const emails = ['a@x.com', 'bad', 'c@x.com'];
 		const { context, http } = ctx({

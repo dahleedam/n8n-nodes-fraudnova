@@ -2,7 +2,7 @@ import { NodeApiError, NodeOperationError } from 'n8n-workflow';
 import type { IDataObject, IExecuteFunctions, INodeExecutionData, JsonObject } from 'n8n-workflow';
 
 import type { CheckType } from './helpers';
-import { chunk, mapBatchItemError, normalizeCountry, shapeCheckOutput } from './helpers';
+import { chunk, groupBy, mapBatchItemError, normalizeCountry, shapeCheckOutput } from './helpers';
 import { FLAG_OPTIONS } from './properties';
 import { fraudNovaRequest } from './transport';
 
@@ -35,7 +35,7 @@ export type CheckOptions = {
 	country?: string;
 };
 
-type Pending = { index: number; subject: string };
+type Pending = { index: number; subject: string; options: CheckOptions };
 
 const nonEmpty = (value: unknown): string | undefined =>
 	typeof value === 'string' && value !== '' ? value : undefined;
@@ -158,8 +158,7 @@ async function checkChunk(
 	type: CheckType,
 	group: Pending[],
 ): Promise<INodeExecutionData[]> {
-	const first = group[0].index;
-	const options = readCheckOptions.call(this, type, first);
+	const { index: first, options } = group[0];
 	const { body, statusCode } = await fraudNovaRequest.call(
 		this,
 		{
@@ -181,14 +180,23 @@ async function checkChunk(
 			itemIndex: first,
 		});
 	}
-	return group.map(({ index, subject }, k) => {
+	return group.map(({ index, subject, options: itemOptions }, k) => {
 		const result = results[k];
 		if (result.success === true) {
-			return successItem(type, subject, result.data, body.credits_remaining, options, index);
+			return successItem(type, subject, result.data, body.credits_remaining, itemOptions, index);
 		}
 		const code = String(result.error);
 		return errorItem(type, subject, mapBatchItemError(type, subject, code), index, code);
 	});
+}
+
+function batchesOf(pending: Pending[]): Pending[][] {
+	const signature = (entry: Pending) => JSON.stringify(apiOptions(entry.options, false));
+	const batches: Pending[][] = [];
+	for (const group of groupBy(pending, signature)) {
+		batches.push(...chunk(group, BATCH_SIZE));
+	}
+	return batches;
 }
 
 export async function executeCheckMany(
@@ -203,10 +211,10 @@ export async function executeCheckMany(
 		if (subject === '') {
 			output[i] = errorItem(type, subject, emptyMessage(type), i, 'empty');
 		} else {
-			pending.push({ index: i, subject });
+			pending.push({ index: i, subject, options: readCheckOptions.call(this, type, i) });
 		}
 	}
-	for (const group of chunk(pending, BATCH_SIZE)) {
+	for (const group of batchesOf(pending)) {
 		try {
 			const shaped = await checkChunk.call(this, type, group);
 			shaped.forEach((item, k) => (output[group[k].index] = item));

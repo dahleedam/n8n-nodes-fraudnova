@@ -48,6 +48,20 @@ export function chunk<T>(items: T[], size: number): T[][] {
 	return chunks;
 }
 
+export function groupBy<T>(items: T[], key: (item: T) => string): T[][] {
+	const groups = new Map<string, T[]>();
+	for (const item of items) {
+		const name = key(item);
+		const group = groups.get(name);
+		if (group) {
+			group.push(item);
+		} else {
+			groups.set(name, [item]);
+		}
+	}
+	return Array.from(groups.values());
+}
+
 export function computeFlags(
 	data: Record<string, unknown>,
 	riskThreshold: number,

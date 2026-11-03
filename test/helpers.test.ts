@@ -3,6 +3,7 @@ import {
 	SIMPLIFIED_FIELDS,
 	chunk,
 	computeFlags,
+	groupBy,
 	mapBatchItemError,
 	mapStatusError,
 	normalizeCountry,
@@ -64,6 +65,21 @@ describe('chunk', () => {
 		const chunks = chunk(big, 100);
 		expect(chunks.map((c) => c.length)).toEqual([100, 100, 50]);
 		expect(chunks.flat()).toEqual(big);
+	});
+});
+
+describe('groupBy', () => {
+	it('returns [] for no items', () => {
+		expect(groupBy([], String)).toEqual([]);
+	});
+
+	it('groups by key in first-seen order, keeping input order within a group', () => {
+		const items = ['a1', 'b1', 'a2', 'c1', 'b2', 'a3'];
+		expect(groupBy(items, (item) => item[0])).toEqual([['a1', 'a2', 'a3'], ['b1', 'b2'], ['c1']]);
+	});
+
+	it('returns one group when every key is equal', () => {
+		expect(groupBy(range(5), () => 'same')).toEqual([range(5)]);
 	});
 });
 
