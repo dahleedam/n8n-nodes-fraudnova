@@ -265,12 +265,18 @@ export async function executeCheckMany(
 }
 
 export async function executeGetBalance(this: IExecuteFunctions): Promise<INodeExecutionData[]> {
-	const { body } = await fraudNovaRequest.call(
-		this,
-		{ method: 'GET', path: '/balance', timeout: SINGLE_TIMEOUT_MS },
-		0,
-	);
-	return [
-		{ json: { credits_remaining: body.credits_remaining as number }, pairedItem: { item: 0 } },
-	];
+	try {
+		const { body } = await fraudNovaRequest.call(
+			this,
+			{ method: 'GET', path: '/balance', timeout: SINGLE_TIMEOUT_MS },
+			0,
+		);
+		const credits = typeof body.credits_remaining === 'number' ? body.credits_remaining : null;
+		return [{ json: { credits_remaining: credits }, pairedItem: { item: 0 } }];
+	} catch (error) {
+		if (!this.continueOnFail()) {
+			throw itemError.call(this, error, 0);
+		}
+		return [{ json: { error: error.message }, pairedItem: { item: 0 } }];
+	}
 }

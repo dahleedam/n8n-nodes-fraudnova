@@ -719,6 +719,42 @@ describe('FraudNova.execute — Get balance and dispatch', () => {
 		expect(result).toEqual([[{ json: { credits_remaining: 97 }, pairedItem: { item: 0 } }]]);
 	});
 
+	it('returns one error item for a failed balance call when On Error is Continue', async () => {
+		const { context, http } = ctx({
+			items: inputs(3),
+			params: { resource: 'account', operation: 'getBalance' },
+			continueOnFail: true,
+		});
+		http.mockResolvedValueOnce(response(401, ERROR_BODIES[401]));
+
+		const result = await run(context);
+
+		expect(http).toHaveBeenCalledTimes(1);
+		expect(result).toEqual([[{ json: { error: BAD_KEY }, pairedItem: { item: 0 } }]]);
+	});
+
+	it('throws a failed balance call when On Error is not Continue', async () => {
+		const { context, http } = ctx({
+			items: inputs(1),
+			params: { resource: 'account', operation: 'getBalance' },
+		});
+		http.mockResolvedValueOnce(response(401, ERROR_BODIES[401]));
+
+		await expect(run(context)).rejects.toThrow(BAD_KEY);
+	});
+
+	it('returns null credits when the balance is not a number', async () => {
+		const { context, http } = ctx({
+			items: inputs(1),
+			params: { resource: 'account', operation: 'getBalance' },
+		});
+		http.mockResolvedValueOnce(response(200, { success: true, credits_remaining: '97' }));
+
+		const result = await run(context);
+
+		expect(result).toEqual([[{ json: { credits_remaining: null }, pairedItem: { item: 0 } }]]);
+	});
+
 	it('rejects an unsupported operation', async () => {
 		const { context, http } = ctx({
 			items: inputs(1),

@@ -111,6 +111,8 @@ An error on a single check stops the workflow by default. Set the node's **On Er
 { "error": "<message>", "ip": "8.8.8.8" }
 ```
 
+**Get Balance** follows the same setting: with On Error set to Continue, a failed call returns one item `{ "error": "<message>" }`.
+
 **Check Many** reports problems per item, and one bad value never stops the run. An item that fails comes out as:
 
 ```json
