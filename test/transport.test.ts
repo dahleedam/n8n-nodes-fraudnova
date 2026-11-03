@@ -120,14 +120,14 @@ describe('fraudNovaRequest', () => {
 		expect(sleep).not.toHaveBeenCalled();
 	});
 
-	it('wraps a non-object body of a 503', async () => {
-		httpRequestWithAuthentication.mockResolvedValueOnce(response(503, '<html>Bad gateway</html>'));
+	it('wraps a non-object body of a 504', async () => {
+		httpRequestWithAuthentication.mockResolvedValueOnce(response(504, '<html>Bad gateway</html>'));
 
 		const error = await caught(call());
 
 		expect(error).toBeInstanceOf(NodeApiError);
-		expect(error.message).toBe('FraudNova returned HTTP 503: <html>Bad gateway</html>');
-		expect(error.httpCode).toBe('503');
+		expect(error.message).toBe('FraudNova returned HTTP 504: <html>Bad gateway</html>');
+		expect(error.httpCode).toBe('504');
 	});
 
 	it('rethrows a transport failure as a NodeApiError', async () => {

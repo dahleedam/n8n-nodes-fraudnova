@@ -113,6 +113,10 @@ function bodyMessage(body: unknown): string {
 		if (typeof message === 'string') {
 			return message;
 		}
+		const title = (body as { title?: unknown }).title;
+		if (typeof title === 'string') {
+			return title;
+		}
 		try {
 			const json = JSON.stringify(body);
 			if (typeof json === 'string') {
@@ -140,6 +144,7 @@ export function mapStatusError(status: number, body: unknown): string {
 		case 429:
 			return `FraudNova rate limit reached: ${fragment}. Use "Check many" for lists or add a Wait node.`;
 		case 502:
+		case 503:
 			return `FraudNova could not complete the check: ${fragment}. The credit was refunded.`;
 		default:
 			return `FraudNova returned HTTP ${status}: ${message}`;

@@ -281,6 +281,30 @@ describe('FraudNova.execute — Check', () => {
 		expect(result[0][0].json).not.toHaveProperty('flagged');
 	});
 
+	it('turns a 503 into an error item when On Error is Continue', async () => {
+		const { context, http } = ctx({
+			items: inputs(1),
+			params: { resource: 'phone', operation: 'check', phone: '123' },
+			continueOnFail: true,
+		});
+		http.mockResolvedValueOnce(response(503, ERROR_BODIES[503]));
+
+		const result = await run(context);
+
+		expect(result).toEqual([
+			[
+				{
+					json: {
+						error:
+							'FraudNova could not complete the check: All upstream keys failed. The credit was refunded.',
+						phone: '123',
+					},
+					pairedItem: { item: 0 },
+				},
+			],
+		]);
+	});
+
 	it('throws a 402 when On Error is not Continue', async () => {
 		const emails = ['a@x.com', 'b@x.com'];
 		const { context, http } = ctx({

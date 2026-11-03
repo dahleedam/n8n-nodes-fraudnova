@@ -76,4 +76,5 @@ export const ERROR_BODIES = {
 	422: { success: false, message: 'The ip field is required.' },
 	429: { success: false, message: 'Rate limit exceeded. Try again shortly.' },
 	502: { success: false, message: 'All upstream keys failed.' },
+	503: { success: false, message: 'All upstream keys failed.' },
 };

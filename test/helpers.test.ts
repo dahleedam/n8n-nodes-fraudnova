@@ -252,6 +252,25 @@ describe('mapStatusError', () => {
 		);
 	});
 
+	it('maps 503 like 502', () => {
+		expect(mapStatusError(503, { message: 'All upstream keys failed.' })).toBe(
+			'FraudNova could not complete the check: All upstream keys failed. The credit was refunded.',
+		);
+	});
+
+	it("uses a Cloudflare error page's title when there is no message", () => {
+		expect(
+			mapStatusError(502, {
+				type: 'x',
+				title: 'Error 502: Bad gateway',
+				status: 502,
+				detail: 'y',
+			}),
+		).toBe(
+			'FraudNova could not complete the check: Error 502: Bad gateway. The credit was refunded.',
+		);
+	});
+
 	it('adds a period to a 422 message that lacks one', () => {
 		expect(mapStatusError(422, { message: 'Bad input' })).toBe(
 			'FraudNova rejected the input: Bad input.',
@@ -275,8 +294,8 @@ describe('mapStatusError', () => {
 	});
 
 	it('maps other statuses with a string body', () => {
-		expect(mapStatusError(503, '<html>Service Unavailable</html>')).toBe(
-			'FraudNova returned HTTP 503: <html>Service Unavailable</html>',
+		expect(mapStatusError(504, '<html>Gateway Timeout</html>')).toBe(
+			'FraudNova returned HTTP 504: <html>Gateway Timeout</html>',
 		);
 	});
 
