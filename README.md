@@ -146,3 +146,5 @@ Released under the MIT license.
 ## Version history
 
 * **1.0.0**: Initial release. IP address, email address and phone number checks (single and many), and account balance.
+
+Published versions start at 1.0.0.
