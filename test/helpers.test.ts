@@ -247,14 +247,14 @@ describe('mapStatusError', () => {
 	});
 
 	it('maps 502', () => {
-		expect(mapStatusError(502, { message: 'All upstream keys failed.' })).toBe(
-			'FraudNova could not complete the check: All upstream keys failed. The credit was refunded.',
+		expect(mapStatusError(502, { message: 'Upstream lookup failed.' })).toBe(
+			'FraudNova could not complete the check: Upstream lookup failed. The credit was refunded.',
 		);
 	});
 
 	it('maps 503 like 502', () => {
-		expect(mapStatusError(503, { message: 'All upstream keys failed.' })).toBe(
-			'FraudNova could not complete the check: All upstream keys failed. The credit was refunded.',
+		expect(mapStatusError(503, { message: 'Upstream lookup failed.' })).toBe(
+			'FraudNova could not complete the check: Upstream lookup failed. The credit was refunded.',
 		);
 	});
 

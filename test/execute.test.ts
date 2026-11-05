@@ -296,7 +296,7 @@ describe('FraudNova.execute — Check', () => {
 				{
 					json: {
 						error:
-							'FraudNova could not complete the check: All upstream keys failed. The credit was refunded.',
+							'FraudNova could not complete the check: Upstream lookup failed. The credit was refunded.',
 						phone: '123',
 					},
 					pairedItem: { item: 0 },
